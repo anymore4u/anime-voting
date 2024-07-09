@@ -20,8 +20,18 @@ public class VoteService {
     }
 
     public boolean vote(String animeId, String userId, String userIp) {
-        // Verificar se o usuário já votou (lógica pode ser adicionada)
-        Vote vote = new Vote(animeId, userId, userIp);
+        // Convert userId to uppercase
+        String upperCaseUserId = userId.toUpperCase();
+
+        // Verificar se o usuário já votou em qualquer anime
+        List<Vote> existingVotes = voteRepository.findByUserId(upperCaseUserId);
+        if (!existingVotes.isEmpty()) {
+            // Usuário já votou
+            return false;
+        }
+
+        // Salvar novo voto
+        Vote vote = new Vote(animeId, upperCaseUserId, userIp);
         voteRepository.save(vote);
         return true;
     }

@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface VoteRepository extends MongoRepository<Vote, String> {
     List<Vote> findByUserIp(String userIp);
+    List<Vote> findByUserId(String userId);
 }

@@ -74,7 +74,34 @@
 			<artifactId>spring-aspects</artifactId>
 			<version>6.1.10</version>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.2.3</version>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<version>5.11.0</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-junit-jupiter</artifactId>
+			<version>5.11.0</version>
+			<scope>test</scope>
+		</dependency>
+
 	</dependencies>
+
+	<profiles>
+		<profile>
+			<id>exportVotes</id>
+			<properties>
+				<spring-boot.run.arguments>--exportVotes</spring-boot.run.arguments>
+			</properties>
+		</profile>
+	</profiles>
 
 	<build>
 		<plugins>
