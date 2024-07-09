@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Vote nos Animes da Temporada</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px;
+        }
+        .card {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            width: 300px;
+            margin: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .card img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+        .card h2 {
+            font-size: 1.5em;
+            margin: 0 0 10px 0;
+        }
+        .card p {
+            margin: 5px 0;
+            text-align: center;
+        }
+        .card a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .card .synopsis {
+            max-height: 60px;
+            overflow: hidden;
+            position: relative;
+        }
+        .card .synopsis::after {
+            content: "...";
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            padding: 0 10px;
+            background: linear-gradient(to left, #fff, rgba(255, 255, 255, 0));
+        }
+        .card .synopsis.expanded {
+            max-height: none;
+            overflow: visible;
+        }
+        .card .read-more {
+            cursor: pointer;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+<h1>Vote nos Animes da Temporada</h1>
+<form action="/vote-name" method="get">
+    <div class="container">
+        <div class="card" th:each="anime : ${animes}">
+            <input name="animeId" required th:value="${anime.id}" type="radio">
+            <h2 th:text="${anime.title}">Anime Title</h2>
+            <div class="synopsis" th:utext="${anime.synopsis}">Anime Synopsis</div>
+            <img alt="Anime Image" th:src="${anime.images.webp.largeImageUrl}"/>
+            <p><a th:href="${anime.url}" th:text="'LINK DO MAL'">LINK DO MAL</a></p>
+            <p th:text="'Score: ' + ${anime.score}">Anime Score</p>
+            <p th:text="'Members: ' + ${anime.members}">Anime Members</p>
+            <p th:text="'Broadcast Day: ' + ${anime.broadcast.day}">Broadcast Day</p>
+            <p th:each="studio : ${anime.studios}" th:text="'Studio: ' + ${studio.name}">Anime Studio</p>
+        </div>
+    </div>
+    <button type="submit">Vote</button>
+</form>
+</body>
+</html>

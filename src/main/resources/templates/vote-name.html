@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Enter Your Name</title>
+</head>
+<body>
+<h1>Enter Your Name</h1>
+<form action="/submit-vote" method="post">
+    <input name="animeId" th:value="${animeId}" type="hidden">
+    <label for="name">Name:</label>
+    <input id="name" name="name" required type="text">
+    <button type="submit">Submit Vote</button>
+</form>
+</body>
+</html>
