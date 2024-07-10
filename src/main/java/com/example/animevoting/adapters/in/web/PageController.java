@@ -35,8 +35,8 @@ public class PageController {
     }
 
     @PostMapping("/submit-vote")
-    public String submitVote(@RequestParam String animeId, @RequestParam String name) {
-        boolean success = voteService.vote(animeId, name, null);  // IP address is set to null
+    public String submitVote(@RequestParam String animeId, @RequestParam String name, @RequestParam String userId) {
+        boolean success = voteService.vote(animeId, userId, name);
         if (success) {
             return "vote-success";
         } else {

@@ -14,8 +14,9 @@ public class ExportCommand implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         if (args.length > 0 && args[0].equals("--exportVotes")) {
+            String templatePath = "src/main/resources/excel-template/anime-export.xlsx"; // Ajuste o caminho conforme necessário
             String filePath = args.length > 1 ? args[1] : "votes.xlsx";
-            excelExporter.exportVotesToExcel(filePath);
+            excelExporter.exportVotesToExcel(templatePath, filePath);
             System.out.println("Votes exported to " + filePath);
         }
     }

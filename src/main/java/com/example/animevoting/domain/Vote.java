@@ -10,21 +10,16 @@ public class Vote {
     private String id;
     private String animeId;
     private String userId;
+    private String name;
     private String userIp;
 
     public Vote() {
     }
 
-    public Vote(String id, String animeId, String userId, String userIp) {
-        this.id = id;
+    public Vote(String animeId, String userId, String name, String userIp) {
         this.animeId = animeId;
         this.userId = userId;
-        this.userIp = userIp;
-    }
-
-    public Vote(String animeId, String userId, String userIp) {
-        this.animeId = animeId;
-        this.userId = userId;
+        this.name = name;
         this.userIp = userIp;
     }
 
@@ -52,6 +47,14 @@ public class Vote {
 
     public void setUserId(String userId) {
         this.userId = userId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getUserIp() {

@@ -1,28 +1,37 @@
 package com.example.animevoting.adapters.in.web;
 
 import com.example.animevoting.application.VoteService;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/votes")
 public class VoteController {
-
+/*
     private final VoteService voteService;
 
+    @Autowired
     public VoteController(VoteService voteService) {
         this.voteService = voteService;
     }
 
-    @PostMapping
-    public String vote(@RequestParam String animeId, @RequestParam String userId, @RequestParam String userIp) {
-        boolean success = voteService.vote(animeId, userId, userIp);
+    @PostMapping("/submit-vote")
+    public ResponseEntity<?> submitVote(@RequestBody Map<String, String> payload) {
+        String animeId = payload.get("animeId");
+        String userId = payload.get("userId");
+
+        boolean success = voteService.vote(animeId, userId);
         if (success) {
-            return "Vote recorded successfully.";
+            return ResponseEntity.ok().body(Map.of("message", "Voto registrado com sucesso!"));
         } else {
-            return "You have already voted for this anime.";
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Usuário já votou."));
         }
     }
+
+
+ */
 }

@@ -7,6 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.SpringBootTest;
+
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
@@ -23,25 +24,35 @@ public class ExportCommandTests {
 
     @Test
     public void shouldExportVotesToDefaultFileWhenOnlyExportVotesArgumentIsProvided() throws Exception {
+        String expectedTemplatePath = "src/main/resources/excel-template/anime-export.xlsx";
+        String expectedFilePath = "votes.xlsx";
+
         exportCommand.run("--exportVotes");
-        verify(excelExporter).exportVotesToExcel("votes.xlsx");
+
+        verify(excelExporter).exportVotesToExcel(expectedTemplatePath, expectedFilePath);
     }
 
     @Test
     public void shouldExportVotesWhenArgumentIsExportVotes() throws Exception {
+        String expectedTemplatePath = "src/main/resources/excel-template/anime-export.xlsx";
+        String expectedFilePath = "customVotes.xlsx";
+
         exportCommand.run("--exportVotes", "customVotes.xlsx");
-        verify(excelExporter).exportVotesToExcel("customVotes.xlsx");
+
+        verify(excelExporter).exportVotesToExcel(expectedTemplatePath, expectedFilePath);
     }
 
     @Test
     public void shouldNotExportVotesWhenNoArgumentsAreProvided() throws Exception {
         exportCommand.run();
-        verify(excelExporter, never()).exportVotesToExcel(anyString());
+
+        verify(excelExporter, never()).exportVotesToExcel(anyString(), anyString());
     }
 
     @Test
     public void shouldNotExportVotesWhenFirstArgumentIsNotExportVotes() throws Exception {
         exportCommand.run("someOtherArgument");
-        verify(excelExporter, never()).exportVotesToExcel(anyString());
+
+        verify(excelExporter, never()).exportVotesToExcel(anyString(), anyString());
     }
 }

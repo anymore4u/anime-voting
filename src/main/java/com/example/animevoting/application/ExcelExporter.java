@@ -3,10 +3,13 @@ package com.example.animevoting.application;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import com.example.animevoting.domain.Vote;
+import com.example.animevoting.domain.Anime;
 import com.example.animevoting.adapters.out.mongodb.VoteRepository;
+import com.example.animevoting.application.AnimeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
@@ -17,25 +20,33 @@ public class ExcelExporter {
     @Autowired
     private VoteRepository voteRepository;
 
-    public void exportVotesToExcel(String filePath) throws IOException {
+    @Autowired
+    private AnimeService animeService;
+
+    public void exportVotesToExcel(String templatePath, String filePath) throws IOException {
+        // Carregar o template de Excel
+        FileInputStream fis = new FileInputStream(templatePath);
+        Workbook workbook = new XSSFWorkbook(fis);
+        Sheet sheet = workbook.getSheetAt(0);
+
+        // Buscar todos os votos
         List<Vote> votes = voteRepository.findAll();
-
-        Workbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("Votes");
-
-        int rowCount = 0;
-        Row headerRow = sheet.createRow(rowCount++);
-        headerRow.createCell(0).setCellValue("Anime ID");
-        headerRow.createCell(1).setCellValue("User ID");
-        headerRow.createCell(2).setCellValue("User IP");
+        int rowCount = 2; // Começar na linha 3 (índice 2)
 
         for (Vote vote : votes) {
             Row row = sheet.createRow(rowCount++);
-            row.createCell(0).setCellValue(vote.getAnimeId());
-            row.createCell(1).setCellValue(vote.getUserId());
-            row.createCell(2).setCellValue(vote.getUserIp());
+
+            // Buscar informações adicionais do anime
+            Anime anime = animeService.getAnimeById(vote.getAnimeId());
+
+            Cell cell1 = row.createCell(1); // Coluna B
+            cell1.setCellValue(anime.getTitle());
+
+            Cell cell2 = row.createCell(2); // Coluna C
+            cell2.setCellValue(vote.getName());
         }
 
+        // Salvar o arquivo preenchido
         try (FileOutputStream fileOut = new FileOutputStream(filePath)) {
             workbook.write(fileOut);
         }

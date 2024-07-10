@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-
 @Service
 public class AnimeService {
 
@@ -30,6 +29,10 @@ public class AnimeService {
     @Scheduled(cron = "0 0 22 * * SUN", zone = "America/Sao_Paulo")
     public void updateAnimeData() {
         fetchAndStoreAnimeData();
+    }
+
+    public Anime getAnimeById(String animeId) {
+        return animeRepository.findById(animeId).orElse(null);
     }
 
     public void fetchAndStoreAnimeData() {
