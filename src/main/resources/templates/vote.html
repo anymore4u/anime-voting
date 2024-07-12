@@ -92,7 +92,7 @@
                     <div class="custom-radio">
                         <input name="animeId" required th:value="${anime.id}" type="radio" onclick="toggleVoteButton()">
                     </div>
-                    <img alt="Anime Image" th:src="${anime.images.webp.largeImageUrl}"/>
+                    <img alt="Anime Image" th:src="${anime.images != null && anime.images.webp != null ? anime.images.webp.largeImageUrl : 'default-image.png'}"/>
                     <div>
                         <h2 th:text="${anime.title}">Anime Title</h2>
                         <div class="synopsis" th:utext="${anime.synopsis}">Anime Synopsis</div>
@@ -102,7 +102,7 @@
                         </p>
                         <p th:if="${anime.score != null}" th:text="'Score: ' + ${anime.score}">Anime Score</p>
                         <p th:if="${anime.members != null}" th:text="'Members: ' + ${anime.members}">Anime Members</p>
-                        <p th:if="${anime.broadcast.day != null}" th:text="'Broadcast Day: ' + ${anime.broadcast.day}">Broadcast Day</p>
+                        <p th:if="${anime.broadcast != null && anime.broadcast.day != null}" th:text="'Broadcast Day: ' + ${anime.broadcast.day}">Broadcast Day</p>
                         <p th:each="studio : ${anime.studios}" th:text="'Studio: ' + ${studio.name}">Anime Studio</p>
                     </div>
                 </div>

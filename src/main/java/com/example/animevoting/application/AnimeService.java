@@ -1,6 +1,7 @@
 package com.example.animevoting.application;
 
 import com.example.animevoting.adapters.out.mongodb.AnimeRepository;
+import com.example.animevoting.adapters.out.mongodb.VoteRepository;
 import com.example.animevoting.domain.Anime;
 import com.example.animevoting.domain.ApiResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +9,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -19,16 +23,30 @@ public class AnimeService {
 
     private final RestTemplate restTemplate;
     private final AnimeRepository animeRepository;
+    private final VoteRepository voteRepository;
+    private final VoteExportService voteExportService;
 
     @Autowired
-    public AnimeService(RestTemplate restTemplate, AnimeRepository animeRepository) {
+    public AnimeService(RestTemplate restTemplate, AnimeRepository animeRepository, VoteRepository voteRepository, VoteExportService voteExportService) {
         this.restTemplate = restTemplate;
         this.animeRepository = animeRepository;
+        this.voteRepository = voteRepository;
+        this.voteExportService = voteExportService;
     }
 
     @Scheduled(cron = "0 0 22 * * SUN", zone = "America/Sao_Paulo")
     public void updateAnimeData() {
-        fetchAndStoreAnimeData();
+        try {
+            exportVotesToExcel();
+            clearAnimeAndVoteData();
+            fetchAndStoreAnimeData();
+        } catch (IOException e) {
+            e.printStackTrace(); // Adapte o tratamento de exceção conforme necessário
+        }
+    }
+
+    public void triggerUpdateAnimeData() {
+        updateAnimeData();
     }
 
     public Anime getAnimeById(String animeId) {
@@ -73,5 +91,20 @@ public class AnimeService {
                 .stream()
                 .sorted(Comparator.comparingDouble(Anime::getScore).reversed())
                 .collect(Collectors.toList());
+    }
+
+    private void exportVotesToExcel() throws IOException {
+        String templatePath = "/app/resources/excel-template/anime-export.xlsx"; // Ajuste o caminho conforme necessário
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("ddMMyyyy");
+        String formattedDate = LocalDate.now().format(formatter);
+        String filePath = "/outFiles/votes" + formattedDate + ".xlsx"; // Ajuste o caminho conforme necessário
+        voteExportService.exportVotesToExcel(templatePath, filePath);
+        System.out.println("Votes exported to " + filePath);
+    }
+
+    private void clearAnimeAndVoteData() {
+        animeRepository.deleteAll();
+        voteRepository.deleteAll();
+        System.out.println("All anime and vote data cleared.");
     }
 }

@@ -37,4 +37,10 @@ public class AnimeController {
         animeService.fetchAndStoreAnimeData();
         return "Anime data updated successfully.";
     }
+
+    @GetMapping("/trigger-update")
+    public String triggerUpdateAnimes() {
+        animeService.triggerUpdateAnimeData();
+        return "Scheduled anime data update triggered successfully.";
+    }
 }
