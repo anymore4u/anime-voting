@@ -1,0 +1,118 @@
+Para otimizar a performance do seu Spring Batch substituindo `findAll()` por paginação alinhada com o chunk size do step, aqui está um prompt estruturado para guiar a implementação:
+
+---
+
+**Objetivo:**  
+Implementar leitura paginada em um `ItemReader` do Spring Batch, substituindo `findAll()`, garantindo que o tamanho da página corresponda ao chunk size do step para processamento eficiente de milhões de registros.
+
+**Requisitos Técnicos:**
+1. Utilizar `PagingAndSortingRepository` para consultas paginadas.
+2. Alinhar o tamanho da página (`pageSize`) com o chunk size do step.
+3. Garantir gerenciamento de estado (para reinicializações/restartes).
+4. Evitar problemas de ordenação inconsistente em grandes datasets.
+
+**Passos Sugeridos:**
+
+1. **Modifique o Repositório:**
+   ```java
+   public interface EntityRepository extends PagingAndSortingRepository<Entity, Long> {
+       // Método padrão do PagingAndSortingRepository já inclui findAll(Pageable)
+   }
+   ```
+
+2. **Implemente um `ItemReader` Paginado Customizado:**
+   ```java
+   public class PaginatedEntityReader implements ItemReader<Entity>, ItemStream {
+       private final EntityRepository repository;
+       private final int pageSize;
+       private int currentPage = 0;
+       private Iterator<Entity> iterator;
+
+       public PaginatedEntityReader(EntityRepository repository, int pageSize) {
+           this.repository = repository;
+           this.pageSize = pageSize;
+       }
+
+       @Override
+       public Entity read() {
+           if (iterator == null || !iterator.hasNext()) {
+               Page<Entity> page = repository.findAll(PageRequest.of(currentPage, pageSize, Sort.by("id")));
+               if (page.isEmpty()) return null;
+               iterator = page.iterator();
+               currentPage++;
+           }
+           return iterator.next();
+       }
+
+       @Override
+       public void open(ExecutionContext executionContext) {
+           currentPage = executionContext.getInt("currentPage", 0);
+       }
+
+       @Override
+       public void update(ExecutionContext executionContext) {
+           executionContext.putInt("currentPage", currentPage);
+       }
+
+       @Override
+       public void close() {}
+   }
+   ```
+
+3. **Configure o Step e Reader com Chunk Size Dinâmico:**
+   ```java
+   @Bean
+   @StepScope
+   public ItemReader<Entity> entityReader(
+           EntityRepository repository,
+           @Value("#{jobParameters['chunkSize']}") int chunkSize) {
+       return new PaginatedEntityReader(repository, chunkSize);
+   }
+
+   @Bean
+   public Step batchStep(ItemReader<Entity> entityReader, ItemWriter<Entity> writer) {
+       return stepBuilderFactory.get("batchStep")
+               .<Entity, Entity>chunk(chunkSize) // Use o mesmo chunkSize
+               .reader(entityReader)
+               .writer(writer)
+               .build();
+   }
+   ```
+
+4. **Garanta Ordenação Consistente:**  
+   Adicione um índice no campo usado para ordenação (ex: `id`) para evitar lentidão em paginação offset-based.
+
+**Observações:**
+- **Performance em Grandes Datasets:** Para datasets extremamente grandes, considere substituir offset pagination por keyset pagination (usando `WHERE id > :lastId`).
+- **Testes:** Valide o comportamento com dados reais e ajuste o `chunkSize` conforme a capacidade do banco/JVM.
+- **Spring Batch 5+:** Aproveite recursos como `@StepScope` e injeção de parâmetros via `jobParameters`.
+
+---
+
+**Exemplo de Uso:**
+```java
+// Inicie o job com chunkSize configurado
+JobParameters jobParameters = new JobParametersBuilder()
+        .addLong("chunkSize", 1000L)
+        .toJobParameters();
+jobLauncher.run(job, jobParameters);
+```
+
+**Alternativa Simplificada (usando `RepositoryItemReader`):**
+```java
+@Bean
+@StepScope
+public RepositoryItemReader<Entity> reader(
+        EntityRepository repository,
+        @Value("#{jobParameters['chunkSize']}") int chunkSize) {
+    return new RepositoryItemReaderBuilder<Entity>()
+            .name("entityReader")
+            .repository(repository)
+            .methodName("findAll")
+            .pageSize(chunkSize)
+            .sorts(Collections.singletonMap("id", Sort.Direction.ASC))
+            .build();
+}
+```
+
+Este prompt resolve o problema de performance garantindo que cada chunk processe exatamente uma página do banco, eliminando sobrecarga de memória e consultas não otimizadas.
