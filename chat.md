@@ -1,81 +1,107 @@
-Ótimo ponto! Como você está usando Java 17 (onde não há Pair) e Spring Batch 5.1.1 (onde CompositeItemReader foi removido), precisamos de uma abordagem diferente para lidar com a leitura de duas fontes de dados.
-
-Solução Alternativa
-
-Em vez de usar CompositeItemReader, criamos um Custom ItemReader que lê e combina os dados manualmente.
+Ótima escolha! Se vamos usar RepositoryItemReader para paginar os dados, precisamos configurar um leitor para cada entidade (EntityA e EntityB) e depois combiná-los logicamente no nosso ItemReader personalizado.
 
 
 ---
 
-Passo 1: Criando um Custom ItemReader
+Solução Atualizada com RepositoryItemReader
 
-Esse leitor buscará dados de EntityA e EntityB e os combinará em um DTO (EntityCombinedDTO).
+Vamos dividir o processo em três partes principais:
+
+1. Criamos dois RepositoryItemReader para EntityA e EntityB (com paginação).
+
+
+2. Criamos um Custom ItemReader para ler e combinar os dados sincronizando a paginação.
+
+
+3. Mantemos o Processador e o Writer, como antes.
+
+
+
+
+---
+
+Passo 1: Criando os RepositoryItemReader
+
+Primeiro, precisamos dos repositórios das entidades.
+
+Repositório de EntityA
+
+@Repository
+public interface EntityARepository extends PagingAndSortingRepository<EntityA, Long> {
+}
+
+Repositório de EntityB
+
+@Repository
+public interface EntityBRepository extends PagingAndSortingRepository<EntityB, Long> {
+}
+
+Agora, criamos os RepositoryItemReader para cada entidade.
+
+Leitor para EntityA
+
+@Bean
+public RepositoryItemReader<EntityA> entityAItemReader(EntityARepository entityARepository) {
+    RepositoryItemReader<EntityA> reader = new RepositoryItemReader<>();
+    reader.setRepository(entityARepository);
+    reader.setMethodName("findAll");
+    reader.setPageSize(10);
+    reader.setSort(Collections.singletonMap("id", Sort.Direction.ASC));
+    return reader;
+}
+
+Leitor para EntityB
+
+@Bean
+public RepositoryItemReader<EntityB> entityBItemReader(EntityBRepository entityBRepository) {
+    RepositoryItemReader<EntityB> reader = new RepositoryItemReader<>();
+    reader.setRepository(entityBRepository);
+    reader.setMethodName("findAll");
+    reader.setPageSize(10);
+    reader.setSort(Collections.singletonMap("id", Sort.Direction.ASC));
+    return reader;
+}
+
+
+---
+
+Passo 2: Criando um Custom ItemReader para Combinar os Dados
+
+Agora, precisamos de um ItemReader que combine os dados paginados das duas entidades.
 
 @Component
 @StepScope
 public class EntityCombinedItemReader implements ItemReader<EntityCombinedDTO> {
 
-    private final EntityManager entityManager;
-    private final List<EntityA> entityAList;
-    private final List<EntityB> entityBList;
-    private int index = 0;
+    private final RepositoryItemReader<EntityA> entityAReader;
+    private final RepositoryItemReader<EntityB> entityBReader;
 
     @Autowired
-    public EntityCombinedItemReader(EntityManager entityManager) {
-        this.entityManager = entityManager;
-        this.entityAList = fetchEntityA();
-        this.entityBList = fetchEntityB();
-    }
-
-    private List<EntityA> fetchEntityA() {
-        return entityManager.createQuery("SELECT e FROM EntityA e", EntityA.class).getResultList();
-    }
-
-    private List<EntityB> fetchEntityB() {
-        return entityManager.createQuery("SELECT e FROM EntityB e", EntityB.class).getResultList();
+    public EntityCombinedItemReader(RepositoryItemReader<EntityA> entityAReader, 
+                                    RepositoryItemReader<EntityB> entityBReader) {
+        this.entityAReader = entityAReader;
+        this.entityBReader = entityBReader;
     }
 
     @Override
-    public EntityCombinedDTO read() {
-        if (index >= entityAList.size() || index >= entityBList.size()) {
+    public EntityCombinedDTO read() throws Exception {
+        EntityA entityA = entityAReader.read();
+        EntityB entityB = entityBReader.read();
+
+        if (entityA == null || entityB == null) {
             return null; // Fim da leitura
         }
 
-        EntityA entityA = entityAList.get(index);
-        EntityB entityB = entityBList.get(index);
-
-        EntityCombinedDTO dto = new EntityCombinedDTO(entityA, entityB);
-        index++;
-        return dto;
-    }
-}
-
-Aqui, EntityCombinedDTO é um DTO que armazena os dados combinados:
-
-public class EntityCombinedDTO {
-    private final EntityA entityA;
-    private final EntityB entityB;
-
-    public EntityCombinedDTO(EntityA entityA, EntityB entityB) {
-        this.entityA = entityA;
-        this.entityB = entityB;
-    }
-
-    public EntityA getEntityA() {
-        return entityA;
-    }
-
-    public EntityB getEntityB() {
-        return entityB;
+        return new EntityCombinedDTO(entityA, entityB);
     }
 }
 
 
 ---
 
-Passo 2: Criando o Processador
+Passo 3: Criando o Processador
 
-O processador transformará o DTO em EntityC.
+O processador transformará os dados no formato final (EntityC).
 
 @Bean
 public ItemProcessor<EntityCombinedDTO, EntityC> processor() {
@@ -94,9 +120,9 @@ public ItemProcessor<EntityCombinedDTO, EntityC> processor() {
 
 ---
 
-Passo 3: Criando o Writer
+Passo 4: Criando o Writer
 
-Usamos um JpaItemWriter para salvar EntityC no banco.
+O writer salvará os novos registros no banco.
 
 @Bean
 public JpaItemWriter<EntityC> writer(EntityManagerFactory entityManagerFactory) {
@@ -108,9 +134,9 @@ public JpaItemWriter<EntityC> writer(EntityManagerFactory entityManagerFactory) 
 
 ---
 
-Passo 4: Criando o Step
+Passo 5: Criando o Step
 
-Usamos o novo StepBuilder.
+Agora, criamos o Step sem StepBuilderFactory, utilizando o novo StepBuilder.
 
 @Bean
 public Step step1(JobRepository jobRepository,
@@ -130,7 +156,7 @@ public Step step1(JobRepository jobRepository,
 
 ---
 
-Passo 5: Criando o Job
+Passo 6: Criando o Job
 
 @Bean
 public Job job(JobRepository jobRepository, Step step1) {
@@ -145,14 +171,10 @@ public Job job(JobRepository jobRepository, Step step1) {
 
 Conclusão
 
-Essa abordagem:
+Agora temos um Job Spring Batch 5.1.1 que: ✅ Usa RepositoryItemReader com paginação para EntityA e EntityB.
+✅ Cria um Custom ItemReader que sincroniza a leitura das duas fontes.
+✅ Processa os dados em um DTO (EntityCombinedDTO) antes de salvar.
+✅ Escreve na EntityC corretamente.
 
-Elimina a necessidade de Pair criando um DTO próprio (EntityCombinedDTO).
-
-Evita o CompositeItemReader, substituindo por um ItemReader personalizado.
-
-Garante compatibilidade com Spring Batch 5.1.1 e Java 17.
-
-
-Agora o batch está totalmente compatível com a versão que você usa! 🚀
+Essa abordagem é 100% compatível com Java 17 e Spring Batch 5.1.1! 🚀
 
