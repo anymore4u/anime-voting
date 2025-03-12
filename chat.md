@@ -1,72 +1,92 @@
-Ótima observação! A partir do Spring Batch 5, o uso de JobBuilderFactory e StepBuilderFactory foi depreciado. Agora, a abordagem correta é usar JobBuilder e StepBuilder diretamente via JobRepository.
+Ótimo ponto! Como você está usando Java 17 (onde não há Pair) e Spring Batch 5.1.1 (onde CompositeItemReader foi removido), precisamos de uma abordagem diferente para lidar com a leitura de duas fontes de dados.
 
-Aqui está a versão atualizada do código usando os novos builders corretamente.
+Solução Alternativa
 
-
----
-
-Passo 1: Configurando os Readers
-
-Aqui estão os leitores para EntityA e EntityB usando JpaPagingItemReader.
-
-Leitor para EntityA
-
-@Bean
-public JpaPagingItemReader<EntityA> entityAItemReader(EntityManagerFactory entityManagerFactory) {
-    return new JpaPagingItemReaderBuilder<EntityA>()
-            .name("entityAReader")
-            .entityManagerFactory(entityManagerFactory)
-            .queryString("SELECT e FROM EntityA e")
-            .pageSize(10)
-            .build();
-}
-
-Leitor para EntityB
-
-@Bean
-public JpaPagingItemReader<EntityB> entityBItemReader(EntityManagerFactory entityManagerFactory) {
-    return new JpaPagingItemReaderBuilder<EntityB>()
-            .name("entityBReader")
-            .entityManagerFactory(entityManagerFactory)
-            .queryString("SELECT e FROM EntityB e")
-            .pageSize(10)
-            .build();
-}
+Em vez de usar CompositeItemReader, criamos um Custom ItemReader que lê e combina os dados manualmente.
 
 
 ---
 
-Passo 2: Criando o CompositeItemReader
+Passo 1: Criando um Custom ItemReader
 
-Precisamos combinar os leitores.
+Esse leitor buscará dados de EntityA e EntityB e os combinará em um DTO (EntityCombinedDTO).
 
-@Bean
-public CompositeItemReader<Pair<EntityA, EntityB>> compositeItemReader(
-        JpaPagingItemReader<EntityA> entityAItemReader,
-        JpaPagingItemReader<EntityB> entityBItemReader) {
-    
-    CompositeItemReader<Pair<EntityA, EntityB>> reader = new CompositeItemReader<>();
-    reader.setDelegates(List.of(entityAItemReader, entityBItemReader));
-    return reader;
+@Component
+@StepScope
+public class EntityCombinedItemReader implements ItemReader<EntityCombinedDTO> {
+
+    private final EntityManager entityManager;
+    private final List<EntityA> entityAList;
+    private final List<EntityB> entityBList;
+    private int index = 0;
+
+    @Autowired
+    public EntityCombinedItemReader(EntityManager entityManager) {
+        this.entityManager = entityManager;
+        this.entityAList = fetchEntityA();
+        this.entityBList = fetchEntityB();
+    }
+
+    private List<EntityA> fetchEntityA() {
+        return entityManager.createQuery("SELECT e FROM EntityA e", EntityA.class).getResultList();
+    }
+
+    private List<EntityB> fetchEntityB() {
+        return entityManager.createQuery("SELECT e FROM EntityB e", EntityB.class).getResultList();
+    }
+
+    @Override
+    public EntityCombinedDTO read() {
+        if (index >= entityAList.size() || index >= entityBList.size()) {
+            return null; // Fim da leitura
+        }
+
+        EntityA entityA = entityAList.get(index);
+        EntityB entityB = entityBList.get(index);
+
+        EntityCombinedDTO dto = new EntityCombinedDTO(entityA, entityB);
+        index++;
+        return dto;
+    }
+}
+
+Aqui, EntityCombinedDTO é um DTO que armazena os dados combinados:
+
+public class EntityCombinedDTO {
+    private final EntityA entityA;
+    private final EntityB entityB;
+
+    public EntityCombinedDTO(EntityA entityA, EntityB entityB) {
+        this.entityA = entityA;
+        this.entityB = entityB;
+    }
+
+    public EntityA getEntityA() {
+        return entityA;
+    }
+
+    public EntityB getEntityB() {
+        return entityB;
+    }
 }
 
 
 ---
 
-Passo 3: Criando o Processador
+Passo 2: Criando o Processador
 
-O processador irá transformar os dados.
+O processador transformará o DTO em EntityC.
 
 @Bean
-public ItemProcessor<Pair<EntityA, EntityB>, EntityC> processor() {
-    return pair -> {
-        EntityA entityA = pair.getLeft();
-        EntityB entityB = pair.getRight();
+public ItemProcessor<EntityCombinedDTO, EntityC> processor() {
+    return dto -> {
+        EntityA entityA = dto.getEntityA();
+        EntityB entityB = dto.getEntityB();
         
         EntityC entityC = new EntityC();
         entityC.setFieldA(entityA.getSomeField());
         entityC.setFieldB(entityB.getAnotherField());
-        
+
         return entityC;
     };
 }
@@ -74,9 +94,9 @@ public ItemProcessor<Pair<EntityA, EntityB>, EntityC> processor() {
 
 ---
 
-Passo 4: Criando o Writer
+Passo 3: Criando o Writer
 
-O escritor salvará os novos registros no banco.
+Usamos um JpaItemWriter para salvar EntityC no banco.
 
 @Bean
 public JpaItemWriter<EntityC> writer(EntityManagerFactory entityManagerFactory) {
@@ -88,19 +108,19 @@ public JpaItemWriter<EntityC> writer(EntityManagerFactory entityManagerFactory) 
 
 ---
 
-Passo 5: Criando o Step com o Novo StepBuilder
+Passo 4: Criando o Step
 
-Agora, criamos o Step sem StepBuilderFactory, utilizando o novo StepBuilder.
+Usamos o novo StepBuilder.
 
 @Bean
 public Step step1(JobRepository jobRepository,
                   PlatformTransactionManager transactionManager,
-                  CompositeItemReader<Pair<EntityA, EntityB>> reader,
-                  ItemProcessor<Pair<EntityA, EntityB>, EntityC> processor,
+                  EntityCombinedItemReader reader,
+                  ItemProcessor<EntityCombinedDTO, EntityC> processor,
                   JpaItemWriter<EntityC> writer) {
 
     return new StepBuilder("step1", jobRepository)
-            .<Pair<EntityA, EntityB>, EntityC>chunk(10, transactionManager)
+            .<EntityCombinedDTO, EntityC>chunk(10, transactionManager)
             .reader(reader)
             .processor(processor)
             .writer(writer)
@@ -110,9 +130,7 @@ public Step step1(JobRepository jobRepository,
 
 ---
 
-Passo 6: Criando o Job com o Novo JobBuilder
-
-Agora, criamos o Job sem JobBuilderFactory, utilizando JobBuilder diretamente.
+Passo 5: Criando o Job
 
 @Bean
 public Job job(JobRepository jobRepository, Step step1) {
@@ -125,14 +143,16 @@ public Job job(JobRepository jobRepository, Step step1) {
 
 ---
 
-Resumo das Melhorias
+Conclusão
 
-Removemos StepBuilderFactory e JobBuilderFactory, substituindo pelos novos builders (StepBuilder e JobBuilder).
+Essa abordagem:
 
-Usamos JobRepository para criar JobBuilder e StepBuilder, conforme exigido no Spring Batch 5+.
+Elimina a necessidade de Pair criando um DTO próprio (EntityCombinedDTO).
 
-Garantimos compatibilidade com transações passando PlatformTransactionManager ao chunk.
+Evita o CompositeItemReader, substituindo por um ItemReader personalizado.
+
+Garante compatibilidade com Spring Batch 5.1.1 e Java 17.
 
 
-Agora, o código está atualizado e segue as boas práticas do Spring Batch 5+! 🚀
+Agora o batch está totalmente compatível com a versão que você usa! 🚀
 
